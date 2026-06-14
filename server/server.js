@@ -12,35 +12,78 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-// ✅ Socket.IO Setup
+// ==============================
+// Socket.IO Setup
+// ==============================
+
 const socketServer = require('./socket');
 const io = socketServer.init(server);
 
-// ✅ Chat route socket injection
+// Chat route socket injection
 const { router: chatRoutes, setSocket } = require('./routes/chatRoutes');
 setSocket(io);
 
-// ✅ Middlewares
-app.use(cors());
-app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// ==============================
+// Middlewares
+// ==============================
 
-// ✅ Routes
+app.use(
+  cors({
+    origin: true,
+    credentials: true
+  })
+);
+
+app.use(express.json());
+
+app.use(
+  '/uploads',
+  express.static(path.join(__dirname, 'uploads'))
+);
+
+// ==============================
+// API Routes
+// ==============================
+
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/products', require('./routes/productRoutes'));
 app.use('/api/profile', require('./routes/profileRoutes'));
 app.use('/api/chat', chatRoutes);
 
+// ==============================
+// React Frontend Serve (Production)
+// ==============================
 
-// ✅ MongoDB Connection
-mongoose.connect(process.env.MONGO_URI)
+if (process.env.NODE_ENV === 'production') {
+  const clientBuildPath = path.join(
+    __dirname,
+    '../client/build'
+  );
+
+  app.use(express.static(clientBuildPath));
+
+  app.get('*', (req, res) => {
+    res.sendFile(
+      path.join(clientBuildPath, 'index.html')
+    );
+  });
+}
+
+// ==============================
+// MongoDB Connection & Server Start
+// ==============================
+
+mongoose
+  .connect(process.env.MONGO_URI)
   .then(() => {
     console.log('✅ MongoDB Connected');
+
     const PORT = process.env.PORT || 5000;
+
     server.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
+      console.log(`🚀 Server running on port ${PORT}`);
     });
   })
-  .catch(err => {
+  .catch((err) => {
     console.error('❌ MongoDB Connection Error:', err);
   });
